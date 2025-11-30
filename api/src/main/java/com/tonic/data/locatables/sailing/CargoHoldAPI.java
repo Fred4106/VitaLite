@@ -7,7 +7,9 @@ import lombok.Getter;
 import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.widgets.Widget;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class CargoHoldAPI
 {
@@ -15,7 +17,20 @@ public class CargoHoldAPI
     {
         return WidgetAPI.isVisible(InterfaceID.SailingBoatCargohold.UNIVERSE);
     }
-
+    public static boolean withdrawCrate(int[] ids) {
+        List<Integer> idList = Arrays.stream(ids).boxed().collect(Collectors.toList());
+        boolean res = false;
+        if (isOpen()) {
+            for(CargoItem item : getItems()) {
+                if (idList.contains(item.getId()) && item.getName().startsWith("Crate")) {
+                    res = true;
+                    WidgetAPI.interact(1, 61800458, item.getSlot(), item.getId());
+                    break;
+                }
+            }
+        }
+        return res;
+    }
     public static void withdrawCrate()
     {
         if(!isOpen())

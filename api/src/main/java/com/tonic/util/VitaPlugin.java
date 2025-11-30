@@ -43,11 +43,12 @@ public class VitaPlugin extends Plugin
             catch (RuntimeException e)
             {
                 Logger.norm("[" + getName() + "] Plugin::loop() has been interrupted.");
+                Logger.error(e);
             }
             catch (Throwable e)
             {
                 Logger.error(e, "[" + getName() + "] Error in loop(): %e");
-                e.printStackTrace();
+                Logger.error(e);
             }
             finally
             {
