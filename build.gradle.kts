@@ -5,6 +5,7 @@ import java.net.URL
 plugins {
     id("com.github.johnrengelman.shadow") version "8.1.1"
     id("java")
+    id("application")
     id("maven-publish")
 }
 
@@ -112,6 +113,9 @@ tasks {
         manifest {
             attributes(mutableMapOf("Main-Class" to "com.tonic.VitaLite"))
         }
+    }
+    application {
+        mainClass = "com.tonic.VitaLite"
     }
 
     shadowJar {
