@@ -7,6 +7,7 @@ import com.tonic.api.entities.NpcAPI;
 import com.tonic.api.entities.PlayerAPI;
 import com.tonic.api.entities.TileObjectAPI;
 import com.tonic.api.game.*;
+import com.tonic.api.handlers.GenericHandlerBuilder;
 import com.tonic.data.wrappers.NpcEx;
 import com.tonic.data.wrappers.PlayerEx;
 import com.tonic.util.DialogueNode;
@@ -149,6 +150,12 @@ public class TransportLoader
                     transports.add(npcTransport(new WorldPoint(1782, 3458, 0), new WorldPoint(1778, 3417, 0), 7483, "Travel"));
                 }
 
+                if(QuestAPI.isCompleted(Quest.CHILDREN_OF_THE_SUN))
+                {
+                    transports.add(npcTransport(new WorldPoint(3280, 3412, 0), new WorldPoint(1700, 3141, 0), "Primio", "Travel"));
+                    transports.add(npcTransport(new WorldPoint(1703, 3140, 0), new WorldPoint(3280, 3412, 0), "Primio", "Travel"));
+                }
+
                 transports.add(npcTransport(new WorldPoint(1779, 3418, 0), new WorldPoint(1784, 3458, 0), 7484, "Travel"));
 
                 // Port sarim
@@ -172,7 +179,7 @@ public class TransportLoader
                 else if (QuestAPI.hasState(Quest.A_KINGDOM_DIVIDED, QuestState.IN_PROGRESS, QuestState.FINISHED) || !filter) // Veos is replaced during/after quest
                 {
                     transports.add(npcBoatTransport(new WorldPoint(3055, 3245, 0),
-                            new WorldPoint(1824, 3691, 0),
+                            new WorldPoint(1824, 3695, 1),
                             "Cabin Boy Herbert",
                             "Port Piscarilius", 4));
                     transports.add(npcBoatTransport(new WorldPoint(3055, 3245, 0),
@@ -317,15 +324,15 @@ public class TransportLoader
                 transports.add(trapDoorTransport(new WorldPoint(3422, 3484, 0), new WorldPoint(3440, 9887, 0), 3432, 3433));
 
                 // Port Piscarilius
-                if (QuestAPI.isCompleted(Quest.A_KINGDOM_DIVIDED) || !filter) // Veos is replaced during/after quest
-                {
-                    transports.add(npcBoatTransport(new WorldPoint(1824, 3691, 0), new WorldPoint(3055, 3245, 0), 10932, "Port Sarim", 4));
-                    transports.add(npcBoatTransport(new WorldPoint(1824, 3691, 0), new WorldPoint(1504, 3399, 0), 10932, "Land's End", 4));
-                }
-                else
-                {
-                    transports.add(npcBoatTransport(new WorldPoint(1824, 3691, 0), new WorldPoint(3055, 3245, 0), 10727, "Port Sarim", 4));
-                }
+//                if (QuestAPI.isCompleted(Quest.A_KINGDOM_DIVIDED) || !filter) // Veos is replaced during/after quest
+//                {
+//                    transports.add(npcBoatTransport(new WorldPoint(1824, 3691, 0), new WorldPoint(3055, 3245, 0), 10932, "Port Sarim", 4));
+//                    transports.add(npcBoatTransport(new WorldPoint(1824, 3691, 0), new WorldPoint(1504, 3399, 0), 10932, "Land's End", 4));
+//                }
+//                else
+//                {
+//                    transports.add(npcBoatTransport(new WorldPoint(1824, 3691, 0), new WorldPoint(3055, 3245, 0), 10727, "Port Sarim", 4));
+//                }
 
                 // Land's End
                 transports.add(npcBoatTransport(new WorldPoint(1504, 3399, 0), new WorldPoint(3055, 3245, 0), 7471, "Port Sarim", 4));
@@ -1139,9 +1146,9 @@ public class TransportLoader
                     }
                     return 2;
                 })
-                .addDelayUntil(1, () -> {
+                .add(1, () -> {
                     WorldPoint worldPoint = PlayerEx.getLocal().getWorldPoint();
-                    return Distance.pathDistanceTo(worldPoint, destination) < 5;
+                    return Distance.pathDistanceTo(worldPoint, destination) < 10 && SceneAPI.isReachable(destination) ? 2 : 0;
                 });
         return new Transport(source, destination, Integer.MAX_VALUE, 0, builder.build(), requirements, objId);
     }
@@ -1156,8 +1163,8 @@ public class TransportLoader
     {
         DialogueNode node = DialogueNode.get()
                 .node((Object[])chatOptions);
-        HandlerBuilder builder = HandlerBuilder.get()
-                .add(0, () -> {
+        GenericHandlerBuilder builder = GenericHandlerBuilder.get()
+                .add(() -> {
                     TileObjectEx obj = new TileObjectQuery()
                             .withId(objId)
                             .within(source, 5)
@@ -1166,13 +1173,19 @@ public class TransportLoader
                     if (obj != null)
                     {
                         TileObjectAPI.interact(obj, action);
-                        return chatOptions != null && chatOptions.length > 0 ? 1 : 3;
                     }
-                    return 0;
                 })
-                .addDelayUntil(1, DialogueAPI::dialoguePresent)
-                .addDelayUntil(2, () -> !node.processStep())
-                .addDelay(3, 1);
+                .addDelayUntil(() -> {
+                    if(SceneAPI.isReachable(destination) && Distance.pathDistanceTo(PlayerEx.getLocal().getWorldPoint(), destination) < 5)
+                    {
+                        return true;
+                    }
+                    if(DialogueAPI.dialoguePresent())
+                    {
+                        node.processStep();
+                    }
+                    return false;
+                });
 
         return new LongTransport(source, destination, Integer.MAX_VALUE, 0, builder.build());
     }

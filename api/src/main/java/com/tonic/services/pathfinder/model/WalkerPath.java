@@ -18,6 +18,7 @@ import com.tonic.queries.TileObjectQuery;
 import com.tonic.queries.WidgetQuery;
 import static com.tonic.services.pathfinder.Walker.*;
 import com.tonic.services.GameManager;
+import com.tonic.services.pathfinder.Walker;
 import com.tonic.services.pathfinder.abstractions.IPathfinder;
 import com.tonic.services.pathfinder.abstractions.IStep;
 import com.tonic.services.pathfinder.teleports.Teleport;
@@ -66,6 +67,7 @@ public class WalkerPath
      */
     public static WalkerPath get(WorldPoint target)
     {
+        target = Walker.getCollisionMap().nearestWalkableEuclidean(target, 5);
         final IPathfinder engine = Static.getVitaConfig().getPathfinderImpl().newInstance();
         List<? extends IStep> path = engine.find(target);
         return new WalkerPath(path, engine.getTeleport());
@@ -91,13 +93,6 @@ public class WalkerPath
         prayerDangerZone = client.getRealSkillLevel(Skill.PRAYER) / 2;
         if(!steps.isEmpty()) {
             destination = steps.get(steps.size() - 1).getPosition();
-        }
-        // Debug: log which steps have transports
-        for(int i = 0; i < steps.size(); i++) {
-            IStep s = steps.get(i);
-            if(s.hasTransport()) {
-                System.out.println("[Pathfinder] Step " + i + " has transport: " + s.getPosition());
-            }
         }
     }
 
@@ -224,14 +219,14 @@ public class WalkerPath
             return true;
         }
 
-        int rand = ThreadLocalRandom.current().nextInt(4, 8);
+        int rand = ThreadLocalRandom.current().nextInt(8, 12);
         if (last.distanceTo2D(dest) > rand && !PlayerEx.getLocal().isIdle())
         {
             return true;
         }
 
         int s = 0;
-        rand = ThreadLocalRandom.current().nextInt(5, 16);
+        rand = ThreadLocalRandom.current().nextInt(10, 16);
         while(s <= rand && s < steps.size() && !steps.get(s).hasTransport())
         {
             if(!SceneAPI.isReachable(local.getWorldLocation(), steps.get(s).getPosition()))
@@ -245,18 +240,22 @@ public class WalkerPath
             s--;
             steps.subList(0, s).clear();
         }
-        // Skip to transport step if it's next and reachable
-        while(steps.size() > 1 && steps.get(1).hasTransport()
-              && SceneAPI.isReachable(local.getWorldLocation(), steps.get(0).getPosition()))
-        {
-            steps.remove(0);
-        }
         step = steps.get(0);
+
+        // Never remove transport steps here - they must be handled by handleTransports()
+        if(step.hasTransport()) {
+            return !isDone();
+        }
+
         IStep nextStep = steps.size() > 1 ? steps.get(1) : null;
-        // Don't consider next step "blocked" if current step has a transport (transport handles the transition)
-        boolean nextBlocked = nextStep != null && !step.hasTransport() && !SceneAPI.isReachable(step.getPosition(), nextStep.getPosition());
-        MovementAPI.walkTowards(step.getPosition());
-        if((!step.hasTransport() && MovementAPI.isMoving()) || nextBlocked || (steps.size() == 1 && local.getWorldLocation().equals(step.getPosition())))
+        // Don't consider next step "blocked" if it has a transport (transport handles the transition)
+        boolean nextBlocked = nextStep != null && !nextStep.hasTransport() && !SceneAPI.isReachable(step.getPosition(), nextStep.getPosition());
+
+        boolean atStepPos = local.getWorldLocation().equals(step.getPosition());
+        boolean isMoving = MovementAPI.isMoving();
+
+        MovementAPI.walkToWorldPoint(step.getPosition());
+        if(isMoving || nextBlocked || atStepPos)
             steps.remove(step);
         return !isDone();
     }
@@ -293,7 +292,7 @@ public class WalkerPath
     }
 
     private boolean handleTransports() {
-        if(!PlayerEx.getLocal().isIdle() && MovementAPI.isMoving())
+        if(!PlayerEx.getLocal().isIdle() && !MovementAPI.isMoving())
         {
             return true;
         }

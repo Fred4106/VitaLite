@@ -39,6 +39,7 @@ import lombok.Getter;
 import lombok.Setter;
 import net.runelite.api.*;
 import net.runelite.api.Point;
+import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.*;
 import net.runelite.api.gameval.InterfaceID;
@@ -540,6 +541,8 @@ public class GameManager extends Overlay {
             boatDebugShowing = false;
         }
 
+        processSpeed();
+
         Widget gameframe = LayoutView.GAMEFRAME.getWidget();
         if(gameframe == null)
             return;
@@ -778,5 +781,47 @@ public class GameManager extends Overlay {
     public void onVarbitChanged(VarbitChanged event)
     {
         BoatStatsAPI.update(event);
+    }
+
+    private LocalPoint lastPoint;
+    private void processSpeed()
+    {
+        if(!SailingAPI.isOnBoat())
+            return;
+        WorldEntity we = BoatCollisionAPI.getPlayerBoat();
+        LocalPoint lp = we.getTargetLocation();
+
+        if (!lp.equals(lastPoint))
+        {
+            if (lastPoint != null)
+            {
+                double trueSpeed = (float) Math.hypot(
+                        (lastPoint.getX() - lp.getX()),
+                        (lastPoint.getY() - lp.getY())
+                );
+                int speed = roundToQuarterTile(trueSpeed) / 32;
+                if(speed > 32)
+                    return;
+                SailingAPI.setSpeed(speed);
+            }
+            lastPoint = lp;
+        }
+        else
+        {
+            SailingAPI.setSpeed(0);
+        }
+    }
+
+    private static int roundToQuarterTile(double trueSpeed)
+    {
+        int quarterTileFloor = ((int) trueSpeed) & ~0x1F;
+        int quarterTileCeil = quarterTileFloor + 0x20;
+
+        if (quarterTileCeil - trueSpeed < trueSpeed - quarterTileFloor)
+        {
+            return quarterTileCeil;
+        }
+
+        return quarterTileFloor;
     }
 }
